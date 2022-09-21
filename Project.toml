@@ -1,0 +1,4 @@
+name = "SatelliteNavigation"
+uuid = "1cf4fc03-7a0c-4965-81e2-4235e980ef58"
+authors = ["vegaf1 <vegaf1@unlv.nevada.edu>"]
+version = "0.1.0"
