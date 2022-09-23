@@ -5,10 +5,10 @@ A Low-Earth Orbiting (LEO) satellite constellation is simulated to track a targe
 
 ## Orbit Design
 The following parameters were changed in the simulation: 
-- RAAN seperation (\omega_{sep})
-- True anomaly seperation (\theta_{sep})
-- Delta True Anomaly seperation (\Delta \theta_{sep})
+- RAAN seperation (ω)
+- True anomaly seperation (Δθ)
+- Delta True Anomaly seperation (θ)
 - Orbit Altitude 
 
-![Alt text](/home/fausto/satellite_formation.png "Satellite Constellation")
+![Alt text](satellite_formation.png "Satellite Constellation")
 
