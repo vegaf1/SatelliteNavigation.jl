@@ -10,6 +10,8 @@ using ForwardDiff
 using PlotlyJS
 using Distributions
 
+include("Doppler4.jl")
+
 # function test()
 #     println("test function works")
 # end
@@ -354,7 +356,7 @@ function get_time(r0_TEC, satposes, zenith, frequency)
     time = [zeros(8) for i = 1:1000]
     Rt = [zeros(8) for i = 1:1000]
 
-    #initial guess for time
+    #initial guess for time (backslash?)
     time[1] = [0.1\time_scale, 0.1\time_scale, 0.1\time_scale, 0.1\time_scale, 0.1\time_scale, 0.1\time_scale, 0.1\time_scale, 0.1\time_scale] #initial guess
 
     #get the measurment residual
