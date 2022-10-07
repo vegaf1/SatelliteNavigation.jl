@@ -10,6 +10,11 @@ using ForwardDiff
 using PlotlyJS
 using Distributions
 using BlockDiagonals
+using GLMakie
+using FileIO
+using Colors
+
+
 
 include("Doppler4.jl")
 include("InteractiveSim.jl")
@@ -135,16 +140,16 @@ end
 function plot_sat_constellation(combined_eci, tag, satnum)
 
     #Plot Satellite 1 and 2 Orbit
-    sat1 = scatter(x=combined_eci[1,:], y=combined_eci[2,:], z=combined_eci[3,:], type="scatter3d", mode="lines", name="orbit 1&2")
+    sat1 = PlotlyJS.scatter(x=combined_eci[1,:], y=combined_eci[2,:], z=combined_eci[3,:], type="scatter3d", mode="lines", name="orbit 1&2")
 
     #Plot Satellite 3 and 4 Orbit
-    sat3 = scatter(x=combined_eci[13,:], y=combined_eci[14,:], z=combined_eci[15,:], type="scatter3d", mode="lines", name="orbit 3&4")
+    sat3 = PlotlyJS.scatter(x=combined_eci[13,:], y=combined_eci[14,:], z=combined_eci[15,:], type="scatter3d", mode="lines", name="orbit 3&4")
 
     #Plot all satellite initial positions
-    satellites_4 = scatter(x=[combined_eci[1,1],combined_eci[7,1], combined_eci[13,1], combined_eci[19,1]], y=[combined_eci[2,1],combined_eci[8,1], combined_eci[14,1], combined_eci[20,1]],z=[combined_eci[3,1],combined_eci[9,1], combined_eci[15,1], combined_eci[21,1]], mode="markers", marker_size = 4, type="scatter3d", name="satellites")
+    satellites_4 = PlotlyJS.scatter(x=[combined_eci[1,1],combined_eci[7,1], combined_eci[13,1], combined_eci[19,1]], y=[combined_eci[2,1],combined_eci[8,1], combined_eci[14,1], combined_eci[20,1]],z=[combined_eci[3,1],combined_eci[9,1], combined_eci[15,1], combined_eci[21,1]], mode="markers", marker_size = 4, type="scatter3d", name="satellites")
 
     #Plot Tag position
-    tag = scatter(x = [tag[1]], y = [tag[2]], z = [tag[3]], type="scatter3d", name="tag", mode="markers", marker_size=5)
+    tag = PlotlyJS.scatter(x = [tag[1]], y = [tag[2]], z = [tag[3]], type="scatter3d", name="tag", mode="markers", marker_size=5)
 
     #Plot the Guess
     #guess = scatter(x = [xyz[1], xyz[1]], y = [xyz[2], xyz[2]], z = [xyz[3], xyz[3]], type="scatter3d", name="guess", mode="markers", marker_size=5)
@@ -157,19 +162,19 @@ function plot_sat_constellation(combined_eci, tag, satnum)
     y = sin.(u) * sin.(v)' 
     z = ones(n) * cos.(v)' 
 
-    earth = surface(z=z*6371000, x=x*6371000, y=y*6371000, showscale = false)
+    earth = PlotlyJS.surface(z=z*6371000, x=x*6371000, y=y*6371000, showscale = false)
 
 
     #add extra orbit and satellites to the plot if there is 7
     if satnum == 7
 
-        sat5 = scatter(x=combined_eci[25,:], y=combined_eci[26,:], z=combined_eci[27,:], type="scatter3d", mode="lines", name="orbit 5&6&7")
-        satellites_7 = scatter(x=[combined_eci[1,1],combined_eci[7,1], combined_eci[13,1], combined_eci[19,1], combined_eci[25,1], combined_eci[31,1], combined_eci[37,1]], y=[combined_eci[2,1],combined_eci[8,1], combined_eci[14,1], combined_eci[20,1], combined_eci[26,1], combined_eci[32,1], combined_eci[38,1]],z=[combined_eci[3,1],combined_eci[9,1], combined_eci[15,1], combined_eci[21,1], combined_eci[27,1], combined_eci[33,1], combined_eci[39,1]], mode="markers", marker_size = 4, type="scatter3d", name="satellites")
-        plot([sat1, sat3, sat5, satellites_7, tag, earth])
+        sat5 = PlotlyJS.scatter(x=combined_eci[25,:], y=combined_eci[26,:], z=combined_eci[27,:], type="scatter3d", mode="lines", name="orbit 5&6&7")
+        satellites_7 = PlotlyJS.scatter(x=[combined_eci[1,1],combined_eci[7,1], combined_eci[13,1], combined_eci[19,1], combined_eci[25,1], combined_eci[31,1], combined_eci[37,1]], y=[combined_eci[2,1],combined_eci[8,1], combined_eci[14,1], combined_eci[20,1], combined_eci[26,1], combined_eci[32,1], combined_eci[38,1]],z=[combined_eci[3,1],combined_eci[9,1], combined_eci[15,1], combined_eci[21,1], combined_eci[27,1], combined_eci[33,1], combined_eci[39,1]], mode="markers", marker_size = 4, type="scatter3d", name="satellites")
+        PlotlyJS.plot([sat1, sat3, sat5, satellites_7, tag, earth])
 
     else
 
-        plot([sat1, sat3, satellites_4, tag, earth])
+        PlotlyJS.plot([sat1, sat3, satellites_4, tag, earth])
 
     end
 
@@ -477,7 +482,7 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
         #clocknoise = randn(8)*1e-9/time_scale # from Novatel resource ~20 ns accuracy
         clocknoise = rand(d_t,8)/time_scale
 
-        TEC = rand(d_unscaled,4) #random sample from TEC distibution
+        TEC = rand(d_unscaled,4) #random sample from unscaled TEC distibution
 
         #Calculating random TEC time delay
         for i=1:4
