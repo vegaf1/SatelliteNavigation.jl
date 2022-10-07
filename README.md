@@ -21,6 +21,6 @@ The following parameters were changed in the simulation:
 
 ## Examples
 
-Setting up the problem (orbital parameters and constellation design) for each tracking method is shown in the jupyter notebooks in the exammples folder. 
+Setting up the problem (orbital parameters and constellation design) for each tracking method is shown in the jupyter notebooks in the examples folder. 
 
 
