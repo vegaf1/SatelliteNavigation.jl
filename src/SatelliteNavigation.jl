@@ -1,6 +1,6 @@
 module SatelliteNavigation
 
-#using GLMakie, FileIO, Colors
+
 using LinearAlgebra
 using BenchmarkTools
 using StaticArrays
@@ -9,13 +9,13 @@ using DelimitedFiles
 using ForwardDiff
 using PlotlyJS
 using Distributions
+using BlockDiagonals
 
 include("Doppler4.jl")
+include("InteractiveSim.jl")
 
-# function test()
-#     println("test function works")
-# end
 
+#function to create the orbits
 function create_sat_orbit(orbit_params)
 
     #orbit_params[1] -> true anomaly seperation
@@ -24,12 +24,12 @@ function create_sat_orbit(orbit_params)
     #orbit_params[4] -> altitude
     #orbit_params[5] -> Number of Satellites
 
+    #only makes changes to the default polar orbit
     iss1 = [6371e3 + (orbit_params[4]*1e3), 0.0004879, 90.6391, 194.5859- (orbit_params[2]/2), 151.2014, 190];
     iss2 = [6371e3 + (orbit_params[4]*1e3), 0.0004879, 90.6391, 194.5859 - (orbit_params[2]/2), 151.2014, 190+orbit_params[1]];
     iss3 = [6371e3 + (orbit_params[4]*1e3), 0.0004879, 90.6391, 194.5859 + (orbit_params[2]/2), 151.2014, 190+orbit_params[3]]; 
     iss4 = [6371e3 + (orbit_params[4]*1e3), 0.0004879, 90.6391, 194.5859 + (orbit_params[2]/2), 151.2014, 190+orbit_params[3]+orbit_params[1]]; 
     
-
     eci0_1 = sOSCtoCART(iss1, use_degrees=true)
     eci0_2 = sOSCtoCART(iss2, use_degrees=true)
     eci0_3 = sOSCtoCART(iss3, use_degrees=true)
@@ -123,9 +123,14 @@ function create_sat_orbit(orbit_params)
         combined_eci = [eci_1; eci_2; eci_3; eci_4]
     end
 
+    #returning the state(position and velocity of 4/7 satellites)
+
     return combined_eci
 
 end
+
+
+#function to plot the orbits and the satellite initial location
 
 function plot_sat_constellation(combined_eci, tag, satnum)
 
@@ -175,7 +180,6 @@ function zenith(satposes, r0, satnum)
 
     zenithangle = zeros(satnum)
 
-
     #vector between tag and the satellite
     normalvec = r0
   
@@ -196,15 +200,18 @@ end
 
 #FUNCTIONS FOR TOA ANALYSIS
 
+#used to find the time (true measurments)
+
 function measurment_residual(r0, satposes, zenith, t, frequency)
 
-    hi = 350e3 #in meters
+    hi = 350e3 #in meters. Height of think ionosphere shell (approximation)
     distance_scale = R_EARTH*(1e-3) # scales km to custom scale
     time_scale = 1/(C_LIGHT/R_EARTH) #scales seconds to custom scale
-    c = 1 # speed of light
+    c = 1 # scaled speed of light
 
     omega = OMEGA_EARTH*time_scale
     
+    #used to scale TEC value
     scale_f1 = (40.3/(frequency[1])^2)*1e22
     scale_f2 = (40.3/(frequency[2])^2)*1e22
     
@@ -253,7 +260,7 @@ function measurment_residual(r0, satposes, zenith, t, frequency)
     residuals = [res1, res2, res3, res4]
 
     if frequency[2] != 0
-
+        #for dual frequency we include the TEC term to estimate out the TEC value as well
         res1 = norm(r0[1:3] - A1*satposes[1,1:3]) - c*(t[1] - r0[4]) + (scale_f1*(r0[5]/cosd(angles[1])))*(1e-3)/distance_scale;
         res2 = norm(r0[1:3] - A2*satposes[2,1:3]) - c*(t[2] - r0[4]) + (scale_f1*(r0[6]/cosd(angles[2])))*(1e-3)/distance_scale;
         res3 = norm(r0[1:3] - A3*satposes[3,1:3]) - c*(t[3] - r0[4]) + (scale_f1*(r0[7]/cosd(angles[3])))*(1e-3)/distance_scale;
@@ -270,6 +277,8 @@ function measurment_residual(r0, satposes, zenith, t, frequency)
     return residuals
     
 end
+
+#used to find the unknown state
 
 function TOA_residual(x, sat_pose_t, zenith, frequency)
 
@@ -318,6 +327,7 @@ function TOA_residual(x, sat_pose_t, zenith, frequency)
             0 0 1];
     end
     
+    #find the residual for 4 satellite case
     res1 = norm(x[1:3] - A1*sat_pose_t[1,1:3]) - c*(sat_pose_t[1,4] - x[4]);
     res2 = norm(x[1:3] - A2*sat_pose_t[2,1:3]) - c*(sat_pose_t[2,4] - x[4]);
     res3 = norm(x[1:3] - A3*sat_pose_t[3,1:3]) - c*(sat_pose_t[3,4] - x[4]);
@@ -327,6 +337,7 @@ function TOA_residual(x, sat_pose_t, zenith, frequency)
 
     if frequency[2] != 0
 
+        #find the residual for the dual frequency case
         res1 = norm(x[1:3] - A1*sat_pose_t[1,1:3]) - c*(sat_pose_t[1,4] - x[4]) + (scale_f1*(x[5]/cosd(angles[1])))*(1e-3)/distance_scale;
         res2 = norm(x[1:3] - A2*sat_pose_t[2,1:3]) - c*(sat_pose_t[2,4] - x[4]) + (scale_f1*(x[6]/cosd(angles[2])))*(1e-3)/distance_scale;
         res3 = norm(x[1:3] - A3*sat_pose_t[3,1:3]) - c*(sat_pose_t[3,4] - x[4]) + (scale_f1*(x[7]/cosd(angles[3])))*(1e-3)/distance_scale;
@@ -400,38 +411,40 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
     c = 1 # speed of light
 
     #variables for the ionosphere time delay term
-    Ip = zeros(4)
-    OF = zeros(4)
-    Iz = zeros(4)
-    Ip_scaled = zeros(4)
+    Ip = zeros(4) #TEC effect on pseudorange 
+    OF = zeros(4) #obliquity factor
+    Iz = zeros(4) #vertical TEC delay
+    Ip_scaled = zeros(4) #TEC effect on pseudorange scaled
 
     #Generate TEC Distribution for night TEC values. For 1 frequency
-    mu = 8e16
-    sigma = 3e16
-    lb = 3e16
-    ub = 13e16
+    mu = 8e16 # mean of TEC distribution
+    sigma = 3e16 #standard deviation of TEC distribution
+    lb = 3e16 #lower bound 
+    ub = 13e16 #upper bound
     d_unscaled = Truncated(Normal(mu,sigma), lb, ub)
-
 
 
     n = 1000 # number of iterations
     #all_r0 = NaN*[zeros(4) for i = 1:n]
 
     #clock error distribution
-    mu_t = 0
+    mu_t = 0 #mean of clock error distribution
     sigma_t = 20e-9 #RMSE for Novatel GPS receiver
-    lb_t = 1e-9
-    ub_t = 30e-9
+    lb_t = 1e-9 #lower bound
+    ub_t = 30e-9 #upper bound
     d_t = Normal(mu_t, sigma_t)
     hi = 350e3 #in meters
 
-    all_r0 = [zeros(4) for i = 1:n]
+    
+    all_r0 = [zeros(4) for i = 1:n] #keep track of all states each iterations
+
+    #store the position of satellites each iteration
     sat1poses = zeros(4,n)
     sat2poses = zeros(4,n)
     sat3poses = zeros(4,n)
     sat4poses = zeros(4,n)
 
-    all_sats_noise = zeros(4,4)
+    all_sats_noise = zeros(4,4) # stores the satellite positions with noise
 
     #If there are 2 frequencies, add additional rows
 
@@ -443,7 +456,7 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
         sat7poses = zeros(4,n)
         sat8poses = zeros(4,n)
 
-        all_sats_noise = zeros(8,4)
+        all_sats_noise = zeros(8,4) # stores the satellite positions with noise
 
     end
 
@@ -459,12 +472,12 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
         
         #create noise from random distribution
         #scaled to the variable (0.1m error for distance & 1e-11 for time)
-        gpsnoise = randn(12)*(1e-4/distance_scale) #adding a 0.1 meter (10 cm) of noise 
+        gpsnoise = randn(12)*(0.1*1e-3/distance_scale) #adding a 0.1 meter (10 cm) of noise 
         #clocknoise = randn(8)*(1e-11/time_scale) #original working (may not be accurate)
         #clocknoise = randn(8)*1e-9/time_scale # from Novatel resource ~20 ns accuracy
         clocknoise = rand(d_t,8)/time_scale
 
-        TEC = rand(d_unscaled,4)
+        TEC = rand(d_unscaled,4) #random sample from TEC distibution
 
         #Calculating random TEC time delay
         for i=1:4
@@ -512,16 +525,20 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
 
         end
         
+        #save the state at every iteration
         X = NaN*[zeros(8) for i = 1:1000]
+
+        #save the residual at every iteration
         R = NaN*[zeros(8) for i = 1:1000]
 
         if frequency[2] == 0
             #Centroid Guess
             rand_TEC = rand(d,4)
+            #this is only solving for 4 variables, last 4 variables don't really matter
             X[1] = [guess[1]/distance_scale, guess[2]/distance_scale, guess[3]/distance_scale, 0.0001/time_scale, rand_TEC[1], rand_TEC[2], rand_TEC[3], rand_TEC[4]]
 
         else
-            #Centroid guess
+            #Centroid guess and arbitrary TEC values
             X[1] = [guess[1]/distance_scale, guess[2]/distance_scale, guess[3]/distance_scale, 0.0001/time_scale, 3e-6, 3.5e-6, 2e-6, 4e-6]
 
         end
@@ -536,6 +553,7 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
 
         for k=1:1000
             
+            #finding the residial
             R[k] = TOA_residual(X[k], all_sats_noise, zenith_angles, frequency)
             
             #println("this is residual: ", norm(R[k]))
@@ -554,18 +572,6 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
 
             conditionnum = cond(jacobian)
             
-            #println("this is the jacobian: ", jacobian)
-            
-            #println("condition number: ", conditionnum)
-            
-            #println("This is R[k]: ", R[k])
-            
-            #println("this is TEC: ", TEC)
-            #println("this is X[k]: ", X[k])
-            
-            #println("this is R[k]: ", norm(R[k]))
-            
-            #println("this is jacobian: ", jacobian)
             
             if frequency[2] == 0
                 
@@ -574,10 +580,10 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
 
                 deltax = vec([deltax_1freq zeros(4)])
             
+                #Armijo line search
                 while norm(TOA_residual(X[k] + α*deltax, all_sats_noise, zenith_angles, frequency)) > norm(TOA_residual(X[k], all_sats_noise, zenith_angles, frequency) + b*α*jacobian[1:4,1:4]'*deltax[1:4])
 
                     α = c*α
-                    #print("this is alpha: ", α)
                 end
 
                 X[k+1] = X[k] + α*deltax
@@ -598,9 +604,11 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
             
         end  
         
+        #save up to only iterations used
         R = R[1:iters]
         X = X[1:iters]
 
+        #final converged state
         all_r0[i] = X[end]
 
     end
@@ -625,6 +633,8 @@ function tag_solve_TOA(all_sats_scaled, guess, zenith_angles, d, frequency)
 
 end
 
+#funtion to setup the simulation 
+
 function get_mean_TOA(combined_eci, i, d, r0_scaled, frequency, zenith_angles)
 
     distance_scale = R_EARTH*(1e-3) # scales km to custom scale
@@ -635,10 +645,11 @@ function get_mean_TOA(combined_eci, i, d, r0_scaled, frequency, zenith_angles)
     
     r0_TEC= vec([r0_scaled TEC]) #actual value
 
+    #matrix of satellite poses
     sat_poses = [combined_eci[1,i] combined_eci[2,i] combined_eci[3,i];combined_eci[7,i] combined_eci[8,i] combined_eci[9,i]; combined_eci[13,i] combined_eci[14,i] combined_eci[15,i]; combined_eci[19,i] combined_eci[20,i] combined_eci[21,i]]*1e-3/distance_scale
      
+    #get the time 
     t = get_time(r0_TEC, sat_poses, zenith_angles, frequency)
-
 
     #In km then to custom units
     r1 = [combined_eci[1,i], combined_eci[2,i], combined_eci[3,i], 0]*1e-3/distance_scale
@@ -646,6 +657,7 @@ function get_mean_TOA(combined_eci, i, d, r0_scaled, frequency, zenith_angles)
     r3 = [combined_eci[13,i],combined_eci[14,i], combined_eci[15,i], 0]*1e-3/distance_scale
     r4 = [combined_eci[19,i], combined_eci[20,i], combined_eci[21,i], 0]*1e-3/distance_scale
     
+    #save time into each vector
     r1[4] = t[1] 
     r2[4] = t[2]
     r3[4] = t[3]
@@ -675,11 +687,13 @@ function get_mean_TOA(combined_eci, i, d, r0_scaled, frequency, zenith_angles)
 
     xyz_guess = sGEOCtoECEF(geodetic, use_degrees = true)*1e-3 #change to km
     
+    #solve for the mean
     mean_rescaled, all_r0, iters = tag_solve_TOA(all_sats_scaled, xyz_guess, zenith_angles, d, frequency)
 
     return mean_rescaled, all_r0, iters
 end
 
+#Find the covariance of the sim
 function find_covariance(all_r0, mean_rescaled)
 
     distance_scale = R_EARTH*(1e-3) # scales km to custom scale

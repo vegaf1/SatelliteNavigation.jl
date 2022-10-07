@@ -59,7 +59,7 @@ function doppler_residual(x, sat_pose_f, time, z, zdot, frequency)
         Idot4 = 0
     end
 
-    #residuals to estimate a frequency offset bdot
+    #residuals to estimate pose a frequency offset bdot
     res1 = (frequency[1]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A1*sat_pose_f[1,1:3]))*(-2*x[1:3]'*A1*omegahat*sat_pose_f[1,1:3] - 2*x[1:3]'*A1*sat_pose_f[1,4:6]+sat_pose_f[1,1:3]'*sat_pose_f[1,4:6]+sat_pose_f[1,4:6]'*sat_pose_f[1,1:3])+Idot1 + x[4]) - sat_pose_f[1,7]
     res2 = (frequency[1]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A2*sat_pose_f[2,1:3]))*(-2*x[1:3]'*A2*omegahat*sat_pose_f[2,1:3] - 2*x[1:3]'*A2*sat_pose_f[2,4:6]+sat_pose_f[2,1:3]'*sat_pose_f[2,4:6]+sat_pose_f[2,4:6]'*sat_pose_f[2,1:3]) +Idot2 + x[4]) - sat_pose_f[2,7]
     res3 = (frequency[1]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A3*sat_pose_f[3,1:3]))*(-2*x[1:3]'*A3*omegahat*sat_pose_f[3,1:3] - 2*x[1:3]'*A3*sat_pose_f[3,4:6]+sat_pose_f[3,1:3]'*sat_pose_f[3,4:6]+sat_pose_f[3,4:6]'*sat_pose_f[3,1:3]) +Idot3 +  x[4]) - sat_pose_f[3,7]
@@ -68,7 +68,7 @@ function doppler_residual(x, sat_pose_f, time, z, zdot, frequency)
     residuals = [res1, res2, res3, res4]
 
     if frequency[2] != 0
-        #Measurments at frequency 2
+        #residuals at frequency 2
         res5 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A1*sat_pose_f[1,1:3]))*(-2*x[1:3]'*A1*omegahat*sat_pose_f[1,1:3] - 2*x[1:3]'*A1*sat_pose_f[1,4:6]+sat_pose_f[1,1:3]'*sat_pose_f[1,4:6]+sat_pose_f[1,4:6]'*sat_pose_f[1,1:3]) + Idot5 + x[4]) - sat_pose_f[5,7]
         res6 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A2*sat_pose_f[2,1:3]))*(-2*x[1:3]'*A2*omegahat*sat_pose_f[2,1:3] - 2*x[1:3]'*A2*sat_pose_f[2,4:6]+sat_pose_f[2,1:3]'*sat_pose_f[2,4:6]+sat_pose_f[2,4:6]'*sat_pose_f[2,1:3]) + Idot6 + x[4]) - sat_pose_f[6,7]
         res7 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(x[1:3] - A3*sat_pose_f[3,1:3]))*(-2*x[1:3]'*A3*omegahat*sat_pose_f[3,1:3] - 2*x[1:3]'*A3*sat_pose_f[3,4:6]+sat_pose_f[3,1:3]'*sat_pose_f[3,4:6]+sat_pose_f[3,4:6]'*sat_pose_f[3,1:3]) + Idot7 + x[4]) - sat_pose_f[7,7]
@@ -83,10 +83,9 @@ function doppler_residual(x, sat_pose_f, time, z, zdot, frequency)
 end
 
 #pose1-4 are satellite locations and velocities
-#r0 = [xyz of tag, emmitted frequency]
+#r0 = [xyz of tag, frequency offset]
 
 function doppler_measurment(r0, sat_poses, time, z, zdot, frequency)
-
 
     #Doppler Custom Units
     distance_scale = R_EARTH*(1e-3) # scales km to custom scale working
@@ -97,7 +96,7 @@ function doppler_measurment(r0, sat_poses, time, z, zdot, frequency)
 
     frequency_scale = 1
 
-    c = 1*1e4 #km/s
+    c = 1*1e4 #scaled speed of light value
 
     h = 350e3 #ionosphere thin shell approx height in meters
 
@@ -123,8 +122,9 @@ function doppler_measurment(r0, sat_poses, time, z, zdot, frequency)
           0 0 1];
 
     if frequency[2] != 0
+    #the get the scaled TEC values to the right magnitude
 
-    #Ionosphere Errors at frequency 1
+        #Ionosphere Errors at frequency 1
         Idot1 = (((40.3*r0[5])*((R_EARTH*sind(z[1]))*(R_EARTH*cosd(z[1])*zdot[1])/(R_EARTH + h)^2))/((frequency[1]^2)*(1-((R_EARTH*sind(z[1]))/(R_EARTH+h))^2)^1.5))*1e20*1e-3/velocity_scale
         Idot2 = (((40.3*r0[6])*((R_EARTH*sind(z[2]))*(R_EARTH*cosd(z[2])*zdot[2])/(R_EARTH + h)^2))/((frequency[1]^2)*(1-((R_EARTH*sind(z[2]))/(R_EARTH+h))^2)^1.5))*1e20*1e-3/velocity_scale
         Idot3 = (((40.3*r0[7])*((R_EARTH*sind(z[3]))*(R_EARTH*cosd(z[3])*zdot[3])/(R_EARTH + h)^2))/((frequency[1]^2)*(1-((R_EARTH*sind(z[3]))/(R_EARTH+h))^2)^1.5))*1e20*1e-3/velocity_scale
@@ -136,6 +136,7 @@ function doppler_measurment(r0, sat_poses, time, z, zdot, frequency)
         Idot7 = (((40.3*r0[7])*((R_EARTH*sind(z[3]))*(R_EARTH*cosd(z[3])*zdot[3])/(R_EARTH + h)^2))/((frequency[2]^2)*(1-((R_EARTH*sind(z[3]))/(R_EARTH+h))^2)^1.5))*1e20*1e-3/velocity_scale
         Idot8 = (((40.3*r0[8])*((R_EARTH*sind(z[4]))*(R_EARTH*cosd(z[4])*zdot[4])/(R_EARTH + h)^2))/((frequency[2]^2)*(1-((R_EARTH*sind(z[4]))/(R_EARTH+h))^2)^1.5))*1e20*1e-3/velocity_scale
     else
+        #if it is single frequency, the errors are added in the solve function
         Idot1 = 0
         Idot2 = 0
         Idot3 = 0
@@ -158,13 +159,13 @@ function doppler_measurment(r0, sat_poses, time, z, zdot, frequency)
 
     if frequency[2] != 0 
 
-    #Measurments at frequency 2
-    deltaf5 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A1*sat_poses[1, 1:3]))*(-2*r0[1:3]'*A1*omegahat*sat_poses[1, 1:3] - 2*r0[1:3]'*A1*sat_poses[1, 4:6]+sat_poses[1, 1:3]'*sat_poses[1, 4:6]+sat_poses[1, 4:6]'*sat_poses[1, 1:3]) + Idot5 + r0[4])
-    deltaf6 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A2*sat_poses[2, 1:3]))*(-2*r0[1:3]'*A2*omegahat*sat_poses[2, 1:3] - 2*r0[1:3]'*A2*sat_poses[2, 4:6]+sat_poses[2, 1:3]'*sat_poses[2, 4:6]+sat_poses[2, 4:6]'*sat_poses[2, 1:3]) + Idot6 + r0[4])
-    deltaf7 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A3*sat_poses[3, 1:3]))*(-2*r0[1:3]'*A3*omegahat*sat_poses[3, 1:3] - 2*r0[1:3]'*A3*sat_poses[3, 4:6]+sat_poses[3, 1:3]'*sat_poses[3, 4:6]+sat_poses[3, 4:6]'*sat_poses[3, 1:3]) + Idot7 + r0[4])
-    deltaf8 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A4*sat_poses[4, 1:3]))*(-2*r0[1:3]'*A4*omegahat*sat_poses[4, 1:3] - 2*r0[1:3]'*A4*sat_poses[4, 4:6]+sat_poses[4, 1:3]'*sat_poses[4, 4:6]+sat_poses[4, 4:6]'*sat_poses[4, 1:3]) + Idot8 + r0[4])
+        #Measurments at frequency 2
+        deltaf5 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A1*sat_poses[1, 1:3]))*(-2*r0[1:3]'*A1*omegahat*sat_poses[1, 1:3] - 2*r0[1:3]'*A1*sat_poses[1, 4:6]+sat_poses[1, 1:3]'*sat_poses[1, 4:6]+sat_poses[1, 4:6]'*sat_poses[1, 1:3]) + Idot5 + r0[4])
+        deltaf6 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A2*sat_poses[2, 1:3]))*(-2*r0[1:3]'*A2*omegahat*sat_poses[2, 1:3] - 2*r0[1:3]'*A2*sat_poses[2, 4:6]+sat_poses[2, 1:3]'*sat_poses[2, 4:6]+sat_poses[2, 4:6]'*sat_poses[2, 1:3]) + Idot6 + r0[4])
+        deltaf7 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A3*sat_poses[3, 1:3]))*(-2*r0[1:3]'*A3*omegahat*sat_poses[3, 1:3] - 2*r0[1:3]'*A3*sat_poses[3, 4:6]+sat_poses[3, 1:3]'*sat_poses[3, 4:6]+sat_poses[3, 4:6]'*sat_poses[3, 1:3]) + Idot7 + r0[4])
+        deltaf8 = (frequency[2]*frequency_scale/c)*(0.5*(1/norm(r0[1:3] - A4*sat_poses[4, 1:3]))*(-2*r0[1:3]'*A4*omegahat*sat_poses[4, 1:3] - 2*r0[1:3]'*A4*sat_poses[4, 4:6]+sat_poses[4, 1:3]'*sat_poses[4, 4:6]+sat_poses[4, 4:6]'*sat_poses[4, 1:3]) + Idot8 + r0[4])
     
-    deltaf = [deltaf1, deltaf2, deltaf3, deltaf4, deltaf5, deltaf6, deltaf7, deltaf8]
+        deltaf = [deltaf1, deltaf2, deltaf3, deltaf4, deltaf5, deltaf6, deltaf7, deltaf8]
     
     end
 
@@ -183,17 +184,17 @@ function tag_solve_Doppler(all_sats_scaled, guess, zenith_angles, time, zdot, fr
 
     frequency_scale = 1
 
-    c = 1*1e4 #km/s
+    c = 1*1e4 #scaled speed of light
 
     h = 350e3 #ionosphere thin shell approx height in meters
 
     #works well for double frequency
     #diff = 50e3*1e-3/distance_scale 
 
-    diff = 25e3*1e-3/distance_scale 
+    diff = 25e3*1e-3/distance_scale #started 25 km from actual solution
 
 
-    n = 1000 # number of iterations
+    n = 1000 # max number of iterations
     #all_r0 = NaN*[zeros(4) for i = 1:n]
     if frequency[2] != 0
 
@@ -227,7 +228,7 @@ function tag_solve_Doppler(all_sats_scaled, guess, zenith_angles, time, zdot, fr
 
      #Monte Carlo Simulation
     for i in 1:n
-        #Parameters for line search
+        #Parameters for Armijo line search
         #b = 0.01
         b = 0.1
         c_=0.5
@@ -557,6 +558,24 @@ function get_mean_Doppler(combined_eci, i, d, r0_scaled, frequency, zenith_angle
 
     return mean_rescaled, all_r0, iters
 end
+
+# #pass in time and frequency accuracy unscaled
+# function get_P(time_accuracy, frequency_accuracy)
+#     position_accuracy = 0.1 * 1e-3/distance_scale #(0.1 meters) 2 sigma standard deviation
+#     velocity_accuracy = 0.01 *1e-3/velocity_scale_doppler #(0.01 meters/second) 2 sigma standard deviation
+    
+#     #covariance matrix is made up by the squares of the standard deviation (variance)
+#     P_TOA_1sat = diagm([(position_accuracy)^2, (position_accuracy)^2, (position_accuracy)^2, (time_accuracy/time_scale)^2])
+#     P_Doppler_1sat = diagm([(position_accuracy)^2, (position_accuracy)^2, (position_accuracy)^2, (velocity_accuracy)^2, (velocity_accuracy)^2, (velocity_accuracy)^2, (frequency_accuracy)^2])
+    
+#     #Make the block diagonal for the 8 measurments
+    
+#     P_TOA = BlockDiagonal([P_TOA_1sat, P_TOA_1sat, P_TOA_1sat, P_TOA_1sat, P_TOA_1sat, P_TOA_1sat, P_TOA_1sat, P_TOA_1sat])
+#     P_Doppler = BlockDiagonal([P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat , P_Doppler_1sat ])
+
+#     return P_TOA, P_Doppler
+# end
+
 
 
 
